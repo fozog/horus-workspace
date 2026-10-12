@@ -11,12 +11,6 @@
     {
       "name": "agent",
       "path": "horus-agent"
-    },
-    {
-      "path": "scripts"
-    },
-    {
-      "path": "run"
     }
   ],
   "settings": {},
