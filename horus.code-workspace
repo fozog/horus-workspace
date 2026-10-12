@@ -14,6 +14,17 @@
     }
   ],
   "settings": {},
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "prepare horus run dir",
+        "type": "shell",
+        "command": "sudo install -d -m 0775 -o root -g $(id -gn) /var/run/horus",
+        "problemMatcher": []
+      }
+    ]
+  },
   "launch": {
     "version": "0.2.0",
     "compounds": [
@@ -21,8 +32,9 @@
         "name": "Probe+Agent",
         "configurations": [
           { "folder": "agent", "name": "Horus-agent (Node.js)" },
-          { "folder": "probe", "name": "Horus (AF_XDP)" }
+          { "folder": "probe", "name": "Horus(AF_XDP)" }
         ],
+        "preLaunchTask": "prepare horus run dir",
         "stopAll": true
       }
     ]

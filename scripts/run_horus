@@ -105,6 +105,11 @@ fi
 
 AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/tmp/horus-agent.sock}"
 AGENT_SOCKET_GROUP="$(id -gn)"
+# /var/run is a tmpfs: recreate the socket directory (never touch /tmp itself)
+AGENT_SOCKET_DIR="$(dirname "$AGENT_SOCKET")"
+if [ "$AGENT_SOCKET_DIR" != "/tmp" ]; then
+    sudo install -d -m 0775 -o root -g "$AGENT_SOCKET_GROUP" "$AGENT_SOCKET_DIR"
+fi
 #sudo bash -c 'ulimit -c unlimited; cd "$1"; exec env DPRC=dprc.2 HORUS_AGENT_SOCKET="$3" HORUS_AGENT_SOCKET_GROUP="$4" "$1/build/$2/horus-shared" -l "4-15" -a fslmc:dpni.5' _ "$BIN_DIR" "$VERSION" "$AGENT_SOCKET" "$AGENT_SOCKET_GROUP"
 echo sudo bash -c 'ulimit -c unlimited; cd "$1"; HORUS_AGENT_SOCKET="$2" HORUS_AGENT_SOCKET_GROUP="$3" "$1horus-shared" ${@:4} ' _ "$BIN_DIR" "$VERSION" "$AGENT_SOCKET" "$AGENT_SOCKET_GROUP" "$EAL_PARAMS"
 sudo bash -c 'ulimit -c unlimited; HORUS_AGENT_SOCKET="$2" HORUS_AGENT_SOCKET_GROUP="$3" "$1/horus-shared" ${@:4} ' _ "$BIN_DIR" "$AGENT_SOCKET" "$AGENT_SOCKET_GROUP" "$EAL_PARAMS" 
