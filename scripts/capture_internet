@@ -1,0 +1,10 @@
+HOST=$1
+INTERFACE=$2
+#adapt the following to the remote network ranges
+export NON_LOCAL_IPV4="((src net 192.168.0.0/24 and not dst net 192.168.0.0/24) or (dst net 192.168.0.0/24 and not src net 192.168.0.0/24)) "
+export NON_LOCAL_IPV6="((src net 2001:861:3082:64a0::/64 and not dst net 2001:861:3082:64a0::/64) or (dst net 2001:861:3082:64a0::/64 and not src net 2001:861:3082:64a0::/64))"
+
+# redirect the output of tcpdump to a local machine file
+# capture_internet 192.168.0.1 eth2 > capture.pcap
+ssh -n -T "$HOST" "sudo tcpdump -U -n -i '$INTERFACE' -w - '$NON_LOCAL_IPV4 or $NON_LOCAL_IPV6'"
+
