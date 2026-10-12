@@ -1,0 +1,6 @@
+[submodule "horus"]
+	path = horus
+	url = git@github.com:fozog/horus.git
+[submodule "horus-agent"]
+	path = horus-agent
+	url = git@github.com:fozog/horus-agent.git

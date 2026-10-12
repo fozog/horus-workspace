@@ -1,0 +1,95 @@
+#!/bin/bash
+set -e
+
+DEV="${1:-eth1}"
+DST_IP="${2:-192.168.100.2}"
+DST_IP_MAX="${2:-192.168.200.2}"
+DST_MAC="${3:-00:11:22:33:44:55}"
+CPU="${1:-3}"
+
+PG="/proc/net/pktgen"
+
+# Load pktgen
+modprobe pktgen
+
+# Reset this CPU's pktgen thread
+echo "rem_device_all" > "${PG}/kpktgend_${CPU}"
+
+# Attach NIC to pktgen CPU
+echo "add_device ${DEV}@${CPU}" > "${PG}/kpktgend_${CPU}"
+
+PGDEV="${PG}/${DEV}@${CPU}"
+
+# Reads a single ethtool -S counter value for DEV, defaulting to 0 if missing.
+read_ethtool_stat() {
+    ethtool -S "${DEV}" 2>/dev/null | awk -F': *' -v key="$1" '$0 ~ key {print $2; exit}'
+}
+
+# The DPAA2 driver has no ethtool stats-reset command and a link down/up
+# cycle does not zero the hw/mac/drv counters either, so record a baseline
+# now and report deltas later to emulate a stats reset at start.
+BASE_HW_TX_FRAMES=$(read_ethtool_stat '\[hw\] tx frames')
+BASE_HW_TX_BYTES=$(read_ethtool_stat '\[hw\] tx bytes')
+BASE_HW_TX_DISCARDED=$(read_ethtool_stat '\[hw\] tx discarded frames')
+BASE_MAC_TX_FRAMES_OK=$(read_ethtool_stat '\[mac\] tx frames ok')
+BASE_MAC_TX_FRAME_ERRORS=$(read_ethtool_stat '\[mac\] tx frame errors')
+
+# Ethernet/IP/UDP packet
+echo "count 10000000"          > "${PGDEV}"   # unlimited
+echo "clone_skb 100000"        > "${PGDEV}"
+echo "pkt_size 64"             > "${PGDEV}"
+
+echo "dst_min ${DST_IP}"            > "${PGDEV}"
+echo "dst_max ${DST_IP_MAX}"            > "${PGDEV}"
+echo "dst_mac ${DST_MAC}"       > "${PGDEV}"
+
+echo "udp_src_min 12345"        > "${PGDEV}"
+echo "udp_src_max 52345"        > "${PGDEV}"
+echo "udp_dst_min 123"          > "${PGDEV}"
+echo "udp_dst_max 123"          > "${PGDEV}"
+
+# Maximum rate: 10 Mpps
+#echo "ratep 10000000"          > "${PGDEV}"
+
+# Use the CPU corresponding to the pktgen thread for TX queue selection
+echo "flag QUEUE_MAP_CPU"       > "${PGDEV}"
+
+echo "Configuration:"
+cat "${PGDEV}"
+
+echo
+echo "Starting ${DEV}:  -> ${DST_IP}:123"
+echo "Press Ctrl-C to stop."
+
+# Dumps pktgen's own TX counters plus the NIC's ethtool -S TX counters,
+# relative to the baseline captured at script start (an effective reset).
+# pkts-sofar is the authoritative pktgen send count: with clone_skb > 0 the
+# driver's tx_packets/ethtool counters can under-report actual transmissions.
+dump_hw_stats() {
+    echo "--- $(date +%T) pktgen result (${PGDEV}) ---"
+    grep -E "pkts-sofar:|Result:|errors" "${PGDEV}" || true
+    echo "--- $(date +%T) NIC TX stats (${DEV}, since start) ---"
+    echo "[hw] tx frames:         $(( $(read_ethtool_stat '\[hw\] tx frames') - BASE_HW_TX_FRAMES ))"
+    echo "[hw] tx bytes:          $(( $(read_ethtool_stat '\[hw\] tx bytes') - BASE_HW_TX_BYTES ))"
+    echo "[hw] tx discarded:     $(( $(read_ethtool_stat '\[hw\] tx discarded frames') - BASE_HW_TX_DISCARDED ))"
+    echo "[mac] tx frames ok:     $(( $(read_ethtool_stat '\[mac\] tx frames ok') - BASE_MAC_TX_FRAMES_OK ))"
+    echo "[mac] tx frame errors:  $(( $(read_ethtool_stat '\[mac\] tx frame errors') - BASE_MAC_TX_FRAME_ERRORS ))"
+}
+
+# Background loop mirrors the periodic stats printed on the DPDK RX side.
+#( while true; do sleep 5; dump_hw_stats; done ) &
+#STATS_PID=$!
+
+trap '
+echo
+echo "=== Final stats (run interupted) ==="
+dump_hw_stats
+' INT
+
+echo start > "${PG}/pgctrl"
+
+# Reached once pktgen finishes (count exhausted).
+#kill "${STATS_PID}" 2>/dev/null
+echo
+echo "=== Final stats (run finished) ==="
+dump_hw_stats

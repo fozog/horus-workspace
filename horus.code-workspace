@@ -1,0 +1,36 @@
+{
+  "folders": [
+    {
+      "name": "horus-workspace",
+      "path": "."
+    },
+    {
+      "name": "probe",
+      "path": "horus"
+    },
+    {
+      "name": "agent",
+      "path": "horus-agent"
+    },
+    {
+      "path": "scripts"
+    },
+    {
+      "path": "run"
+    }
+  ],
+  "settings": {},
+  "launch": {
+    "version": "0.2.0",
+    "compounds": [
+      {
+        "name": "Probe+Agent",
+        "configurations": [
+          { "folder": "agent", "name": "Horus-agent (Node.js)" },
+          { "folder": "probe", "name": "Horus (AF_XDP)" }
+        ],
+        "stopAll": true
+      }
+    ]
+  }
+}

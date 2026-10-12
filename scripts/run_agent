@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Launch the horus-agent web console. Location defaults to a sibling
+# "horus-agent" checkout; override with HORUS_AGENT_DIR.
+HORUS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+AGENT_DIR="${HORUS_AGENT_DIR:-${HORUS_DIR}/../horus-agent}"
+
+if [ ! -f "${AGENT_DIR}/package.json" ]; then
+    echo "horus-agent not found in ${AGENT_DIR} (set HORUS_AGENT_DIR)" >&2
+    exit 1
+fi
+cd "${AGENT_DIR}"
+
+if [ ! -d node_modules ]; then
+    npm ci
+fi
+
+export HORUS_AGENT_HOST="${HORUS_AGENT_HOST:-0.0.0.0}"
+export HORUS_AGENT_PORT="${HORUS_AGENT_PORT:-3000}"
+export HORUS_AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/tmp/horus-agent.sock}"
+
+exec node --import tsx ./src/server.ts "$@" &

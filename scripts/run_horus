@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+function select_version()
+{
+    HORUS_BASE="$HOME/horus-workspace"
+    BIN_DIR="$HORUS_BASE/horus/build/$VERSION"
+    CONFIG_DIR="$HORUS_BASE/run"
+
+    SHARE_BASE="$HORUS_BASE/run"
+
+    DATA_DIR="${SHARE_BASE}/data"
+    ETHERTYPES_CSV="${DATA_DIR}/ethertypes.csv"
+
+    SCRIPTS_DIR="$HORUS_BASE}/scripts"
+    ETHERTYPE_UPDATE_SCRIPT="${SCRIPTS_DIR}/update_ethertype_table.py"
+}
+
+function select_installed()
+{
+    BIN_DIR="/usr/local/bin"
+    CONFIG_DIR="/usr/local/etc/horus"
+
+    SHARE_BASE="/usr/local/share"
+
+    DATA_DIR="${SHARE_BASE}/data"
+    ETHERTYPES_CSV="${DATA_DIR}/ethertypes.csv"
+
+    SCRIPTS_DIR="${SHARE_BASE}/scripts"
+    ETHERTYPE_UPDATE_SCRIPT="${SCRIPTS_DIR}/update_ethertype_table.py"
+}
+
+VERSION=${1}
+if [ "$VERSION" == "release" ]; then
+    shift
+    EAL_PARAMS="$*"
+    select_version
+elif [ "$VERSION" == "debug" ]; then
+    shift
+    EAL_PARAMS="$*"
+    select_version
+elif [ "$VERSION" == "installed" ]; then
+    shift
+    EAL_PARAMS="$*"
+    select_installed
+else
+    VERSION=installed
+    EAL_PARAMS="$*"
+    select_installed
+fi
+
+
+
+# 2. Check if regeneration is needed:
+# Regenerate if the CSV doesn't exist OR if it is older than 30 days (1 month)
+RUN_GENERATION=false
+
+if [ ! -f "${ETHERTYPES_CSV}" ]; then
+    echo "Configuration CSV does not exist. Generating..."
+    RUN_GENERATION=true
+else
+    # Check file age (older than 30 days / 720 hours)
+    # Using 'find' with -mtime +30 is a reliable way to check file age
+    if [ -n "$(find "${ETHERTYPES_CSV}" -mtime +30 2>/dev/null)" ]; then
+        echo "Configuration CSV is older than 1 month. Refreshing..."
+        RUN_GENERATION=true
+    else
+        echo "Configuration CSV is up to date (less than 1 month old)."
+    fi
+fi
+
+if [ "$RUN_GENERATION" = true ]; then
+    # 3. Create a transient temporary directory for eth.txt
+    TMP_DIR="$(mktemp -d)"
+    
+    # Ensure cleanup happens on any exit condition (success or error)
+    trap 'rm -rf -- "${TMP_DIR}"' EXIT
+
+    # Change into temp dir so python script downloads/reads eth.txt locally there,
+    # or pass/handle it depending on script design. 
+    # (Note: Our python script downloads directly from URL, but if it needs a local path 
+    # or you want eth.txt handled transiently, we download it here safely):
+    echo "Downloading transient eth.txt into temporary directory..."
+    curl -s "https://standards-oui.ieee.org/ethertype/eth.txt" -o "${TMP_DIR}/eth.txt"
+
+    # If your python script looks for eth.txt locally in the current directory, 
+    # we run it from inside ${TMP_DIR} or point it. 
+    # Assuming the python script pulls directly via URL (as written previously), 
+    # we just execute it and output to the target config path.
+    # If you modified the python script to read a local file, you can move/copy it here.
+    
+    echo "Running Python parser..."
+    # Temporarily override output destination or run python script
+    # Running python script directly:
+    python3 "${ETHERTYPE_UPDATE_SCRIPT}"
+
+    # Move or ensure the resulting CSV is placed properly in ${DATA_DIR}
+    if [ -f "ethertypes.csv" ] && [ "ethertypes.csv" != "${ETHERTYPES_CSV}" ]; then
+        mv "ethertypes.csv" "${ETHERTYPES_CSV}"
+    fi
+
+    echo "Configuration successfully updated at ${ETHERTYPES_CSV}"
+fi
+
+
+AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/tmp/horus-agent.sock}"
+AGENT_SOCKET_GROUP="$(id -gn)"
+#sudo bash -c 'ulimit -c unlimited; cd "$1"; exec env DPRC=dprc.2 HORUS_AGENT_SOCKET="$3" HORUS_AGENT_SOCKET_GROUP="$4" "$1/build/$2/horus-shared" -l "4-15" -a fslmc:dpni.5' _ "$BIN_DIR" "$VERSION" "$AGENT_SOCKET" "$AGENT_SOCKET_GROUP"
+echo sudo bash -c 'ulimit -c unlimited; cd "$1"; HORUS_AGENT_SOCKET="$2" HORUS_AGENT_SOCKET_GROUP="$3" "$1horus-shared" ${@:4} ' _ "$BIN_DIR" "$VERSION" "$AGENT_SOCKET" "$AGENT_SOCKET_GROUP" "$EAL_PARAMS"
+sudo bash -c 'ulimit -c unlimited; HORUS_AGENT_SOCKET="$2" HORUS_AGENT_SOCKET_GROUP="$3" "$1/horus-shared" ${@:4} ' _ "$BIN_DIR" "$AGENT_SOCKET" "$AGENT_SOCKET_GROUP" "$EAL_PARAMS" 

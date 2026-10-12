@@ -1,0 +1,104 @@
+#!/bin/bash
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <interface_name>"
+    echo "Example: $0 eth0"
+    exit 1
+fi
+
+INTERFACE=$1
+
+if [ ! -d "/sys/class/net/$INTERFACE" ]; then
+    echo "Error: Network interface '$INTERFACE' does not exist."
+    exit 1
+fi
+
+echo "=================================================="
+echo " Gathering Network Topology Info for: $INTERFACE"
+echo "=================================================="
+
+# 1. Get the local PCI Address (BDF)
+PCI_ADDR=$(basename "$(readlink "/sys/class/net/$INTERFACE/device")")
+echo -e "NIC PCI Address:\t$PCI_ADDR"
+
+# 2. Extract the absolute hardware path hierarchy from sysfs
+SYSFS_PATH=$(readlink -f "/sys/class/net/$INTERFACE/device")
+
+# Find the absolute top-level PCI root host bridge (e.g., pci0000:00 or pci0000:fe)
+ROOT_BRIDGE_DIR=$(echo "$SYSFS_PATH" | grep -oE 'pci[0-9a-fA-F]{4}:[0-9a-fA-F]{2}')
+echo -e "True PCI Root Bridge:\t$ROOT_BRIDGE_DIR"
+
+# 3. Resolve the NUMA Node belonging to that Host Bridge
+NUMA_NODE=$(cat "/sys/devices/$ROOT_BRIDGE_DIR/numa_node" 2>/dev/null)
+
+# Fallback check if the root bridge folder has no direct assignment
+if [ -z "$NUMA_NODE" ] || [ "$NUMA_NODE" -eq "-1" ]; then
+    NUMA_NODE=$(cat "/sys/class/net/$INTERFACE/device/numa_node")
+fi
+
+if [ "$NUMA_NODE" -eq "-1" ]; then
+    echo -e "Resolved NUMA Node:\t0 (Fallback: Architecture reported -1)"
+    TARGET_NODE=0
+else
+    echo -e "Resolved NUMA Node:\t$NUMA_NODE"
+    TARGET_NODE=$NUMA_NODE
+fi
+
+# 4. Fetch the target DPDK Core Strings & Node States
+echo "--------------------------------------------------"
+echo " NUMA Node CPU Topology (For DPDK Setup):"
+echo "--------------------------------------------------"
+
+NODE_DIR="/sys/devices/system/node/node${TARGET_NODE}"
+
+if [ -d "$NODE_DIR" ]; then
+    # General configurations (historically online/mapped ranges)
+    if [ -f "$NODE_DIR/cpulist" ]; then
+        CORE_LIST=$(cat "$NODE_DIR/cpulist")
+        CORE_MAP=$(cat "$NODE_DIR/cpumap" | tr -d ',')
+        echo -e "Suggested Core List (-l):\t$CORE_LIST"
+        echo -e "Suggested Core Mask (-c):\t0x$CORE_MAP"
+    fi
+
+    # Read explicitly Online and Possible CPU rings if exposed by system/kernel
+    # If the kernel doesn't split node-specific states natively, we fallback gracefully
+    if [ -f "$NODE_DIR/online" ]; then
+        echo -e "Online CPUs on Node:\t$(cat "$NODE_DIR/online")"
+    else
+        # Parsing fallback using lscpu if sysfs direct properties differ on legacy setups
+        LSCPU_ONLINE=$(lscpu | grep -E "^NUMA node${TARGET_NODE} CPU\(s\):" | awk -F':' '{print $2}' | sed 's/^[ \t]*//')
+        echo -e "Online CPUs on Node:\t${LSCPU_ONLINE:-$CORE_LIST}"
+    fi
+
+    if [ -f "$NODE_DIR/possible" ]; then
+        echo -e "Possible CPUs on Node:\t$(cat "$NODE_DIR/possible")"
+    else
+        # Dynamic calculation: cross-reference system-wide possible CPUs against this node's bitmap
+        GLOBAL_POSSIBLE=$(cat /sys/devices/system/cpu/possible 2>/dev/null)
+        echo -e "Possible CPUs on Node:\t${GLOBAL_POSSIBLE:-$CORE_LIST (Matches Online)}"
+    fi
+else
+    echo "Could not parse CPU execution pools for Node ${TARGET_NODE}."
+fi
+
+# 5. Extract IRQs
+echo "--------------------------------------------------"
+echo " Associated IRQs:"
+echo "--------------------------------------------------"
+if [ -d "/sys/class/net/$INTERFACE/device/msi_irqs" ]; then
+    IRQS=$(ls "/sys/class/net/$INTERFACE/device/msi_irqs")
+    for irq in $IRQS; do
+        IRQ_NAME=$(grep " $irq:" /proc/interrupts | awk -F':' '{print $2}' | sed 's/^[ \t]*//')
+        IRQ_CLEAN_NAME=$(echo "$IRQ_NAME" | awk '{print $NF}')
+        echo -e "  IRQ: $irq \t -> $IRQ_CLEAN_NAME"
+    done
+else
+    LEGACY_IRQ=$(cat "/sys/class/net/$INTERFACE/device/irq")
+    if [ -n "$LEGACY_IRQ" ] && [ "$LEGACY_IRQ" -ne 0 ]; then
+        echo -e "  IRQ: $LEGACY_IRQ \t (Legacy Mode)"
+    else
+        echo "  No active hardware IRQs detected."
+    fi
+fi
+echo "=================================================="
+
