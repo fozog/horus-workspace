@@ -4,3 +4,6 @@
 [submodule "horus-agent"]
 	path = horus-agent
 	url = git@github.com:fozog/horus-agent.git
+[submodule "horus-delegate"]
+	path = horus-delegate
+	url = git@github.com:fozog/horus-delegate.git
