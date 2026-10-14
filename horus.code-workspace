@@ -11,6 +11,10 @@
     {
       "name": "webUI",
       "path": "horus-agent"
+    },
+    {
+      "name": "delegate",
+      "path": "horus-delegate"
     }
   ],
   "settings": {},
