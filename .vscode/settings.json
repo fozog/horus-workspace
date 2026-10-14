@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    "horus": true,
+    "horus-agent": true
+  }
+}
