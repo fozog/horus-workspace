@@ -9,7 +9,7 @@
       "path": "horus"
     },
     {
-      "name": "agent",
+      "name": "webUI",
       "path": "horus-agent"
     }
   ],
@@ -29,9 +29,9 @@
     "version": "0.2.0",
     "compounds": [
       {
-        "name": "Probe+Agent",
+        "name": "Probe+WebUI",
         "configurations": [
-          { "folder": "agent", "name": "Horus-agent (Node.js)" },
+          { "folder": "webUI", "name": "Horus-agent (Node.js)" },
           { "folder": "probe", "name": "Horus(AF_XDP)" }
         ],
         "preLaunchTask": "prepare horus run dir",
