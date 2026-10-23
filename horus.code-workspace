@@ -36,7 +36,7 @@
         "name": "Probe+WebUI",
         "configurations": [
           { "folder": "webUI", "name": "Horus-agent (Node.js)" },
-          { "folder": "probe", "name": "Horus(AF_XDP)" }
+          { "folder": "probe", "name": "Horus(IXGBE)" }
         ],
         "preLaunchTask": "prepare horus run dir",
         "stopAll": true

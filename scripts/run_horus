@@ -30,7 +30,7 @@ function select_installed()
     ETHERTYPE_UPDATE_SCRIPT="${SCRIPTS_DIR}/update_ethertype_table.py"
 }
 
-VERSION=${1}
+VERSION=${1:-installed}
 if [ "$VERSION" == "release" ]; then
     shift
     EAL_PARAMS="$*"
@@ -106,7 +106,7 @@ fi
 AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/tmp/horus-agent.sock}"
 AGENT_SOCKET_GROUP="$(id -gn)"
 # /var/run is a tmpfs: recreate the socket directory (never touch /tmp itself)
-AGENT_SOCKET_DIR="$(dirname "$AGENT_SOCKET")"
+AGENT_SOCKET_DIR=/var/run/horus
 if [ "$AGENT_SOCKET_DIR" != "/tmp" ]; then
     sudo install -d -m 0775 -o root -g "$AGENT_SOCKET_GROUP" "$AGENT_SOCKET_DIR"
 fi
