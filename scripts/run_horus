@@ -103,7 +103,7 @@ if [ "$RUN_GENERATION" = true ]; then
 fi
 
 
-AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/tmp/horus-agent.sock}"
+AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/var/run/horus/agent.sock}"
 AGENT_SOCKET_GROUP="$(id -gn)"
 # /var/run is a tmpfs: recreate the socket directory (never touch /tmp itself)
 AGENT_SOCKET_DIR=/var/run/horus
