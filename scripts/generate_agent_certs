@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+WORKSPACE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+AGENT_DIR="${HORUS_AGENT_DIR:-${WORKSPACE_DIR}/horus-agent}"
+GENERATOR="${AGENT_DIR}/scripts/generate-tls.mjs"
+
+if [ ! -f "${GENERATOR}" ]; then
+    echo "Certificate generator not found in ${AGENT_DIR} (set HORUS_AGENT_DIR)" >&2
+    exit 1
+fi
+
+if [ "$#" -eq 0 ]; then
+    echo "Usage: $0 <DNS name or IP> [additional names/IPs...]" >&2
+    exit 1
+fi
+
+exec node "${GENERATOR}" "$@"
