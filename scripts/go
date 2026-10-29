@@ -1,4 +1,0 @@
-sudo ./build/ntp-mon \
-    --vdev=net_af_xdp0,iface=eth0,queue_count=1 \
-    -l 0,1,2 \
-    --no-pci
