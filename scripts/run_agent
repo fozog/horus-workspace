@@ -16,7 +16,7 @@ if [ ! -d node_modules ]; then
     npm ci
 fi
 
-export HORUS_AGENT_HOST="${HORUS_AGENT_HOST:-0.0.0.0}"
+export HORUS_AGENT_HOST="${HORUS_AGENT_HOST:-::}"
 export HORUS_AGENT_PORT="${HORUS_AGENT_PORT:-3000}"
 export HORUS_AGENT_SOCKET="${HORUS_AGENT_SOCKET:-/tmp/horus-agent.sock}"
 
