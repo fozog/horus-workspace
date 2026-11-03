@@ -22,7 +22,16 @@
     "version": "2.0.0",
     "tasks": [
       {
-        "label": "make release probe",
+        "label": "probe: build debug",
+        "type": "process",
+        "command": "make",
+        "args": ["debug"],
+        "options": { "cwd": "${workspaceFolder:probe}" },
+        "group": "build",
+        "problemMatcher": ["$gcc"]
+      },
+      {
+        "label": "probe: build release",
         "type": "process",
         "command": "make",
         "args": ["release"],
@@ -31,7 +40,7 @@
         "problemMatcher": ["$gcc"]
       },
       {
-        "label": "build webUI release",
+        "label": "webUI: build release",
         "type": "process",
         "command": "npm",
         "args": ["run", "build"],
@@ -40,19 +49,13 @@
         "problemMatcher": ["$tsc"]
       },
       {
-        "label": "make release",
-        "dependsOn": ["make release probe", "build webUI release"],
+        "label": "workspace: build release",
+        "dependsOn": ["probe: build release", "webUI: build release"],
         "group": "build",
         "problemMatcher": []
       },
       {
-        "label": "prepare horus release",
-        "dependsOn": ["make release probe", "prepare horus run dir"],
-        "dependsOrder": "sequence",
-        "problemMatcher": []
-      },
-      {
-        "label": "prepare horus run dir",
+        "label": "probe: prepare run dir",
         "type": "shell",
         "command": "sudo install -d -m 0775 -o root -g $(id -gn) /var/run/horus",
         "problemMatcher": []
@@ -68,7 +71,7 @@
           { "folder": "webUI", "name": "Horus-agent (Release)" },
           { "folder": "probe", "name": "Horus(IXGBE) (Release)" }
         ],
-        "preLaunchTask": "prepare horus run dir",
+        "preLaunchTask": "probe: prepare run dir",
         "stopAll": true
       },
       {
@@ -77,7 +80,7 @@
           { "folder": "webUI", "name": "Horus-agent (Node.js)" },
           { "folder": "probe", "name": "Horus(IXGBE)" }
         ],
-        "preLaunchTask": "prepare horus run dir",
+        "preLaunchTask": "probe: prepare run dir",
         "stopAll": true
       }
     ]
